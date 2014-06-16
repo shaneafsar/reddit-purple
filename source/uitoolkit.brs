@@ -1,7 +1,7 @@
 '**********************************************************
-'**  DeviantART Example Application - slideshow and audioplayer
-'**  March 2009
-'**  Copyright (c) 2009 Roku Inc. All Rights Reserved.
+'**  RedditPurple application
+'**  initially based off of the DeviantArt example application
+'**  in the Roku SDK
 '**********************************************************
 
 ' ******************************************************
