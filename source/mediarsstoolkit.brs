@@ -60,24 +60,9 @@ Function GetPostList(feed_url) As Object
 		pl.Push(newPostFromJson(m.http,item))
 	next
 
-	'xml=m.http.GetToString()
-	'rss=CreateObject("roXMLElement")
-	'if not rss.Parse(xml) then stop
-	'print "rss@version=";rss@version
-
-
-
-	'pl=CreateObject("roList")
-	'for each item in rss.channel.item
-	''	pl.Push(newPostFromXML(m.http, item))
-	''	print "photo title=";pl.Peek().GetTitle()
-	'next
-
 	return pl
 
 End Function
-
-
 
 Function newPostFromXML(http As Object, xml As Object) As Object
   photo = {http:http, xml:xml, GetURL:pGetURL}
@@ -340,6 +325,19 @@ Sub addGifFrames(itemList as Object, contentArray as Object)
   end for
 end sub
 
+function getJson(feed_url) As Object
+  http = CreateObject("roUrlTransfer")
+  print "GetJson: ";feed_url
+  http.SetUrl(feed_url)
+
+  jsonAsString = http.GetToString()
+
+  json = ParseJSON(jsonAsString)
+
+  return json
+
+end function
+
 Sub ShowImageScreen(post)
   port = CreateObject("roMessagePort")
 	slideshow = CreateObject("roSlideShow")
@@ -353,6 +351,7 @@ Sub ShowImageScreen(post)
 
 	contentArray = CreateObject("roArray", 1, true)
   singleItem = true
+  isNotGif = true
 	url = post.url
 
 	if url<>invalid then
@@ -362,7 +361,7 @@ Sub ShowImageScreen(post)
 
     print "Path extension: ";extension
     if extension = "gif" then
-
+      isNotGif = false
       canvas = CreateObject("roImageCanvas")
       portLoading = CreateObject("roMessagePort")
       canvas.SetMessagePort(portLoading)
@@ -376,9 +375,31 @@ Sub ShowImageScreen(post)
       canvas.SetLayer(1, items)
       canvas.Show()
 
-      addGifFrames(getGifFrames(url), contentArray)
+      resultObj = getJson("http://upload.gfycat.com/transcode?fetchUrl="+url)
 
-      canvas.close()
+
+      if resultObj.DoesExist("mp4Url") then
+        rFixUrl = CreateObject("roRegex", "\\", "i")
+        newUrl = rFixUrl.ReplaceAll(resultObj.mp4Url,"")
+        print "New GifUrl";newUrl
+        canvas.close()
+        showGifScreen({
+          Stream:{
+            url: newUrl,
+            quality : false,
+            contentid : resultObj.gfyname
+          }
+        })
+      else
+        items.push({
+          Text: "Could not load GIF",
+          TextAttrs: { font: "large", color: "#a0a0a0" },
+          TargetRect: {x: 500, y: 300, w: 300, h: 200}
+        })
+        canvas.SetLayer(2, items)
+      end if
+
+      'addGifFrames(getGifFrames(url), contentArray)
 
 		else if (post.domain = "imgur.com") then
             r2 = CreateObject("roRegex", "imgur.com/a", "i")
@@ -432,50 +453,43 @@ Sub ShowImageScreen(post)
 		print "PRELOAD url: ";url
 	end if
 
+  if isNotGif then
+	 slideshow.SetContentList(contentArray)
 
-	slideshow.SetContentList(contentArray)
+	 slideshow.Show()
 
-	slideshow.Show()
-
-	waitformsg:
-	msg = wait(0, port)
-	print "DisplaySlideShow: class of msg: ";type(msg); " type:";msg.gettype()
-	'for each x in msg:print x;"=";msg[x]:next
-	if msg <> invalid then							'invalid is timed-out
-		if type(msg) = "roSlideShowEvent" then
-    		if msg.isScreenClosed() then
-	    		return
-    		else if msg.isButtonPressed() then
-                print "Menu button pressed: " + Stri(msg.GetIndex())
-                'example button usage during pause:
-                'if msg.GetIndex() = btn_hide slideshow.ClearButtons()
-    		else if msg.isPlaybackPosition() then
-	    		onscreenphoto = msg.GetIndex()
-		    	print "slideshow display: " + Stri(msg.GetIndex())
-    		else if msg.isRemoteKeyPressed() then
-    			print "Button pressed: " + Stri(msg.GetIndex())
-    		else if msg.isRequestSucceeded() then
-	    		print "preload succeeded: " + Stri(msg.GetIndex())
-    		elseif msg.isRequestFailed() then
-    			print "preload failed: " + Stri(msg.GetIndex())
-    		elseif msg.isRequestInterrupted() then
-    			print "preload interrupted" + Stri(msg.GetIndex())
-    		elseif msg.isPaused() then
-                print "paused"
-                'example button usage during pause:
-                'buttons will only be shown in when the slideshow is paused
-                'slideshow.AddButton(btn_more_from_author, "more photos from this author")
-                'slideshow.AddButton(btn_similar, "similar images")
-                'slideshow.AddButton(btn_bookmark, "mark as favorite")
-                'slideshow.AddButton(btn_hide, "hide buttons")
-    		elseif msg.isResumed() then
-                print "resumed"
-                'example button usage during pause:
-                'slideshow.ClearButtons()
-            end if
-        end if
-	end if
-	goto waitformsg
+  	waitformsg:
+  	msg = wait(0, port)
+  	print "DisplaySlideShow: class of msg: ";type(msg); " type:";msg.gettype()
+  	'for each x in msg:print x;"=";msg[x]:next
+  	if msg <> invalid then							'invalid is timed-out
+  		if type(msg) = "roSlideShowEvent" then
+      		if msg.isScreenClosed() then
+  	    		return
+      		else if msg.isButtonPressed() then
+                  print "Menu button pressed: " + Stri(msg.GetIndex())
+                  'example button usage during pause:
+                  'if msg.GetIndex() = btn_hide slideshow.ClearButtons()
+      		else if msg.isPlaybackPosition() then
+  	    		onscreenphoto = msg.GetIndex()
+  		    	print "slideshow display: " + Stri(msg.GetIndex())
+      		else if msg.isRemoteKeyPressed() then
+      			print "Button pressed: " + Stri(msg.GetIndex())
+      		else if msg.isRequestSucceeded() then
+  	    		print "preload succeeded: " + Stri(msg.GetIndex())
+      		elseif msg.isRequestFailed() then
+      			print "preload failed: " + Stri(msg.GetIndex())
+      		elseif msg.isRequestInterrupted() then
+      			print "preload interrupted" + Stri(msg.GetIndex())
+      		elseif msg.isPaused() then
+                  print "paused"
+      		elseif msg.isResumed() then
+                  print "resumed"
+              end if
+          end if
+  	end if
+  	goto waitformsg
+  end if
 End Sub
 
 
