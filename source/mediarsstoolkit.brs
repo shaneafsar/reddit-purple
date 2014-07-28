@@ -16,18 +16,48 @@ Function CreateMediaRSSConnection()As Object
 		http: CreateObject("roUrlTransfer"),
 		GetPostList: GetPostList,
 		DisplayTopPosts: DisplayTopPosts,
+    DisplayTopPostsCustom: DisplayTopPostsCustom,
 		DisplayPosts: DisplayPosts,
+    ShowKeyboard: ShowKeyboard,
         Reddits:[
                 "r/all",
                 "r/pics",
-                "r/gifs"
+                "r/gifs",
+                "Enter reddit"
             ]
 		}
 
 	return rss
 End Function
 
+Sub ShowKeyboard(port as object)
+     screen = CreateObject("roKeyboardScreen")
+     screen.SetMessagePort(port)
+     screen.SetTitle("Search Screen")
+     screen.SetText("")
+     screen.SetDisplayText("enter reddit name")
+     screen.AddButton(1, "finished")
+     screen.AddButton(2, "back")
+     screen.Show()
 
+     while true
+         msg = wait(0, screen.GetMessagePort())
+         print "message received"
+         if type(msg) = "roKeyboardScreenEvent"
+             if msg.isScreenClosed()
+                 return
+             else if msg.isButtonPressed() then
+                 print "Evt:"; msg.GetMessage ();" idx:"; msg.GetIndex()
+                 if msg.GetIndex() = 1
+                     redditName = screen.GetText()
+                     m.DisplayTopPostsCustom(redditName)
+                     print "reddit name: "; redditName
+                     return
+                 endif
+             endif
+         endif
+     end while
+End Sub
 
 
 Function DisplaySetup(port as object)
@@ -39,10 +69,20 @@ Function DisplaySetup(port as object)
 End Function
 
 Sub DisplayTopPosts(index As Integer)
-	screen = DisplaySetup(m.port)
-	'screen.SetHeaderText("All")
-	postlist = m.GetPostList("http://www.reddit.com/"+m.Reddits[index]+".json?limit=100")
-	m.DisplayPosts(screen,postlist)
+  if index = 3 then
+    m.ShowKeyboard(m.port)
+  else
+  	screen = DisplaySetup(m.port)
+  	'screen.SetHeaderText("All")
+  	postlist = m.GetPostList("http://www.reddit.com/"+m.Reddits[index]+".json?limit=100")
+  	m.DisplayPosts(screen,postlist)
+  end if
+End Sub
+
+Sub DisplayTopPostsCustom(name As String)
+  screen = DisplaySetup(m.port)
+  postlist = m.GetPostList("http://www.reddit.com/r/"+name+".json?limit=100")
+  m.DisplayPosts(screen,postlist)
 End Sub
 
 
@@ -338,6 +378,38 @@ function getJson(feed_url) As Object
 
 end function
 
+Sub loadGif(urls)
+  canvas = CreateObject("roImageCanvas")
+  portLoading = CreateObject("roMessagePort")
+  canvas.SetMessagePort(portLoading)
+  items = []
+  items.Push({
+      Text: "Loading gif"
+      TextAttrs: { font: "large", color: "#a0a0a0" }
+      TargetRect: {x: 200, y: 75, w: 300, h: 200}
+  })
+  canvas.SetLayer(0, { Color: "#ff000000", CompositionMode: "Source" })
+  canvas.SetLayer(1, items)
+  canvas.Show()
+
+  streams = []
+  rFixUrl = CreateObject("roRegex", "\\", "i")
+  for each url in urls
+    resultObj = getJson("http://upload.gfycat.com/transcode?fetchUrl="+url)
+    newUrl = rFixUrl.ReplaceAll(resultObj.mp4Url,"")
+    print "newUrl"; newUrl
+    streams.push({
+      url: newUrl,
+      quality : false,
+      contentid : resultObj.gfyname
+    })
+  end for
+
+  canvas.Close()
+  showGifScreen({Streams:streams})
+
+end sub
+
 Sub ShowImageScreen(post)
   port = CreateObject("roMessagePort")
 	slideshow = CreateObject("roSlideShow")
@@ -358,46 +430,12 @@ Sub ShowImageScreen(post)
 		r = CreateObject("roRegex", "https", "")
 		url = r.Replace(url,"http")
     extension = url.Right(3)
+    print "domain: ";post.domain
 
     print "Path extension: ";extension
     if extension = "gif" then
       isNotGif = false
-      canvas = CreateObject("roImageCanvas")
-      portLoading = CreateObject("roMessagePort")
-      canvas.SetMessagePort(portLoading)
-      items = []
-      items.Push({
-          Text: "Loading gif"
-          TextAttrs: { font: "large", color: "#a0a0a0" }
-          TargetRect: {x: 200, y: 75, w: 300, h: 200}
-      })
-      canvas.SetLayer(0, { Color: "#ff000000", CompositionMode: "Source" })
-      canvas.SetLayer(1, items)
-      canvas.Show()
-
-      resultObj = getJson("http://upload.gfycat.com/transcode?fetchUrl="+url)
-
-
-      if resultObj.DoesExist("mp4Url") then
-        rFixUrl = CreateObject("roRegex", "\\", "i")
-        newUrl = rFixUrl.ReplaceAll(resultObj.mp4Url,"")
-        print "New GifUrl";newUrl
-        canvas.close()
-        showGifScreen({
-          Stream:{
-            url: newUrl,
-            quality : false,
-            contentid : resultObj.gfyname
-          }
-        })
-      else
-        items.push({
-          Text: "Could not load GIF",
-          TextAttrs: { font: "large", color: "#a0a0a0" },
-          TargetRect: {x: 500, y: 300, w: 300, h: 200}
-        })
-        canvas.SetLayer(2, items)
-      end if
+      loadGif([url])
 
       'addGifFrames(getGifFrames(url), contentArray)
 
@@ -419,11 +457,21 @@ Sub ShowImageScreen(post)
 
               singleItem = false
 
+              gifsArray = []
               for each item in objOfImages.items
-                  aa = CreateObject("roAssociativeArray")
-                  aa.Url = "http://i.imgur.com/"+item.hash+item.ext
-                  contentArray.Push(aa)
+                aa = CreateObject("roAssociativeArray")
+                aa.Url = "http://i.imgur.com/"+item.hash+item.ext
+                if item.ext = ".gif" then
+                  gifsArray.push(aa.Url)
+                end if
+                contentArray.Push(aa)
               end for
+
+              'If there are gifs, then show those instead of images
+              if gifsArray.Count() > 0 then
+                isNotGif = false
+                loadGif(gifsArray)
+              end if
 
             else
 
@@ -441,6 +489,18 @@ Sub ShowImageScreen(post)
 			url = r.Replace(url,"i.lvme.me")
 			url = url + ".png"
 
+    else if post.domain.Instr("gfycat") > -1 then
+      isNotGif = false
+      startIndex = url.Instr(".com/")
+      print "startIndex: ";startIndex
+      folderString = url.Mid(startIndex+5)
+      print "folderString: ";folderString
+      contentIdString = folderString
+      if folderString.Instr(".gif") > -1 then
+        folderString = folderString.Mid(0,folderString.Len()-4)+".gif"
+      end if
+      print "folderString ";folderString
+      loadGif(["http://giant.gfycat.com/"+folderString])
 		end if
 
     'If there is only one item, then add it

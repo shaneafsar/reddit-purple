@@ -27,21 +27,6 @@ Sub Main()
 		return
 	end if
 
-	'Play some classical music while watching slideshow:
-	'audio = CreateObject("roAudioPlayer")
-	'item = CreateObject("roAssociativeArray")
-	'item.Url = "http://www.theflute.co.uk/media/BachCPE_SonataAmin_1.wma"
-	'item.StreamFormat = "wma"
-	'audio.AddContent(item)
-	'item.Url = "http://www.theflute.co.uk/media/Godard_SuitedeTroisMorceaux_3.wma"
-    '  item.StreamFormat = "wma"
-	'audio.AddContent(item)
-	'item.Url = "http://www.theflute.co.uk/media/Bizet_Habanera.wma"
-	'item.StreamFormat = "wma"
-	'audio.AddContent(item)
-	'audio.SetLoop(true)
-	'audio.Play()
-
 	' Create an Array of AAs.
 	' Each AA contains the data needed to display a Main Menu icon
 	hdposter = "pkg:/images/mm_icon_focus_hd.png"

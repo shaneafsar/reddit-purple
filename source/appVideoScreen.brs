@@ -23,8 +23,6 @@ Function showVideoScreen(episode As Object, isGif as Boolean)
     port = CreateObject("roMessagePort")
     screen = CreateObject("roVideoScreen")
     screen.SetMessagePort(port)
-
-    'screen.SetPositionNotificationPeriod(30)
     screen.SetLoop(isGif)
     screen.SetContent(episode)
     screen.Show()
@@ -59,7 +57,9 @@ Function showVideoScreen(episode As Object, isGif as Boolean)
 
 End Function
 
-Function showGifScreen(gif as Object)
-    showVideoScreen(gif, true)
+Function showGifScreen(option as Object)
+    for each stream in option.Streams
+        showVideoScreen({Stream:stream}, true)
+    end for
 End Function
 
